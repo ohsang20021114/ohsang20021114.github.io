@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교 식단표</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #F8F9FA; /* Neutral Light */
+            color: #343A40; /* Neutral Dark */
+        }
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .table-header {
+            background-color: #007BFF; /* Primary Blue */
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1rem;
+            text-align: center;
+        }
+        .table-cell {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #E0E0E0; /* Light Gray Border */
+            text-align: center;
+        }
+        .table-row:nth-child(even) {
+            background-color: #F0F8FF; /* Lightest Blue */
+        }
+        .table-row:hover {
+            background-color: #E0F2FE; /* Slightly darker light blue on hover */
+            cursor: pointer;
+        }
+        .table-row.selected {
+            background-color: #ADD8E6; /* Light Blue for selection */
+            font-weight: 500;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .btn-primary {
+            background-color: #007BFF; /* Primary Blue */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3; /* Darker Blue on hover */
+        }
+        .btn-tertiary {
+            background-color: #28A745; /* Green for new action */
+            color: white;
+        }
+        .btn-tertiary:hover {
+            background-color: #218838; /* Darker Green on hover */
+        }
+        .message-box {
+            background-color: #E0F2FE;
+            border: 1px solid #007BFF;
+            color: #073B4C;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1.5rem;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1rem;
+            white-space: pre-wrap; /* Preserve newlines */
+            word-break: break-word; /* Break long words */
+        }
+        .menu-input-group input, .menu-input-group select {
+            padding: 0.75rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            width: 100%;
+        }
+        .menu-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .summary-table-container {
+            margin-top: 2rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+        }
+        .summary-table th, .summary-table td {
+            padding: 0.75rem;
+            text-align: center;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        .summary-table thead {
+            background-color: #5CACEE; /* Secondary Blue */
+            color: white;
+        }
+        .summary-table tbody tr:nth-child(even) {
+            background-color: #F0F8FF;
+        }
+        .admin-section.locked .menu-input-group input,
+        .admin-section.locked .menu-input-group button:not(#adminLoginBtn) {
+            pointer-events: none;
+            opacity: 0.6;
+            background-color: #e9ecef;
+        }
+        .admin-section.locked #setTodayMenusBtn {
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-2xl font-bold text-center mb-6 text-[#073B4C]" id="mainTitle">날짜를 선택해 주세요.</h1>
+        <p class="mb-4 text-center text-gray-700">
+            아래는 학생들의 학년, 이름, 그리고 메뉴 선택을 기록할 수 있는 표입니다. 먼저 날짜와 식사 시간대를 선택해 주세요.
+        </p>
+
+        <div class="flex justify-center items-center space-x-4 mb-6">
+            <label for="menuDate" class="font-bold text-lg">날짜:</label>
+            <input type="date" id="menuDate" class="p-2 border rounded text-lg">
+            
+            <label for="mealType" class="font-bold text-lg">식사:</label>
+            <select id="mealType" class="p-2 border rounded text-lg">
+                <option value="breakfast">아침</option>
+                <option value="lunch" selected>점심</option>
+                <option value="dinner">저녁</option>
+            </select>
+        </div>
+
+        <div class="mt-8 mb-6 admin-section locked">
+            <h2 class="text-xl font-bold text-center mb-4 text-[#073B4C]">메뉴 관리자</h2>
+            <div class="flex justify-center items-center space-x-2 mb-4">
+                <input type="password" id="adminPassword" placeholder="비밀번호 입력" class="p-2 border rounded w-48">
+                <button id="adminLoginBtn" class="btn btn-primary">메뉴 관리자 로그인</button>
+            </div>
+            
+            <div id="adminMenuInput" class="menu-input-group">
+                <p class="text-center text-gray-700">
+                    아래에 선택된 날짜와 식사 시간대에 제공될 메뉴 4가지를 입력하고, '메뉴 설정' 버튼을 클릭하세요.
+                </p>
+                <input type="text" id="menuInput1" placeholder="메뉴 1 (예: 돈까스)">
+                <input type="text" id="menuInput2" placeholder="메뉴 2 (예: 김치찌개)">
+                <input type="text" id="menuInput3" placeholder="메뉴 3 (예: 불고기덮밥)">
+                <input type="text" id="menuInput4" placeholder="메뉴 4 (예: 닭갈비)">
+                <div class="flex justify-center">
+                    <button id="setTodayMenusBtn" class="btn btn-tertiary">메뉴 설정 📝</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200 mb-6">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-[#007BFF]">
+                    <tr>
+                        <th scope="col" class="table-header rounded-tl-lg">번호</th>
+                        <th scope="col" class="table-header">학년</th>
+                        <th scope="col" class="table-header">이름</th>
+                        <th scope="col" class="table-header rounded-tr-lg">선택 메뉴</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200" id="studentTableBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="menuSummaryTableContainer" class="summary-table-container hidden">
+            <h2 class="text-xl font-bold text-center mb-4 text-[#073B4C]">메뉴별 선택 현황</h2>
+            <table class="min-w-full summary-table divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th>메뉴</th>
+                        <th>선택 학생 수</th>
+                    </tr>
+                </thead>
+                <tbody id="menuSummaryTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div id="messageBox" class="message-box">
+            날짜와 식사 시간대를 선택해 주세요.
+        </div>
+    </div>
+
+    <script type="module">
+        // DOM 요소 가져오기
+        const mainTitle = document.getElementById('mainTitle');
+        const menuDateInput = document.getElementById('menuDate');
+        const mealTypeSelect = document.getElementById('mealType');
+        const studentTableBody = document.getElementById('studentTableBody');
+        const adminSection = document.querySelector('.admin-section');
+        const adminPasswordInput = document.getElementById('adminPassword');
+        const adminLoginBtn = document.getElementById('adminLoginBtn');
+        const setTodayMenusBtn = document.getElementById('setTodayMenusBtn');
+        const menuInput1 = document.getElementById('menuInput1');
+        const menuInput2 = document.getElementById('menuInput2');
+        const menuInput3 = document.getElementById('menuInput3');
+        const menuInput4 = document.getElementById('menuInput4');
+        const messageBox = document.getElementById('messageBox');
+        const menuSummaryTableContainer = document.getElementById('menuSummaryTableContainer');
+        const menuSummaryTableBody = document.getElementById('menuSummaryTableBody');
+
+        // 애플리케이션 상태
+        const ADMIN_PASSWORD = '1234'; // 관리자 비밀번호 설정
+        let students = [
+            { id: 1, grade: '1학년', name: '김민준', selectedMenu: {} },
+            { id: 2, grade: '2학년', name: '이서윤', selectedMenu: {} },
+            { id: 3, grade: '3학년', name: '박지후', selectedMenu: {} },
+            { id: 4, grade: '1학년', name: '최예나', selectedMenu: {} },
+            { id: 5, grade: '4학년', name: '정하준', selectedMenu: {} },
+            { id: 6, grade: '5학년', name: '강서아', selectedMenu: {} },
+            { id: 7, grade: '6학년', name: '조은우', selectedMenu: {} },
+            { id: 8, grade: '1학년', name: '윤도현', selectedMenu: {} },
+            { id: 9, grade: '2학년', name: '장유진', selectedMenu: {} },
+            { id: 10, grade: '3학년', name: '한지훈', selectedMenu: {} },
+            { id: 11, grade: '4학년', name: '오수아', selectedMenu: {} },
+            { id: 12, grade: '5학년', name: '김준서', selectedMenu: {} },
+            { id: 13, grade: '6학년', name: '이하윤', selectedMenu: {} },
+            { id: 14, grade: '1학년', name: '박서준', selectedMenu: {} },
+            { id: 15, grade: '2학년', name: '최아린', selectedMenu: {} },
+            { id: 16, grade: '3학년', name: '정우진', selectedMenu: {} },
+            { id: 17, grade: '4학년', name: '강채원', selectedMenu: {} },
+            { id: 18, grade: '5학년', name: '조시우', selectedMenu: {} },
+            { id: 19, grade: '6학년', name: '윤지우', selectedMenu: {} },
+            { id: 20, grade: '1학년', name: '장도윤', selectedMenu: {} },
+            { id: 21, grade: '2학년', name: '한서현', selectedMenu: {} },
+            { id: 22, grade: '3학년', name: '오민준', selectedMenu: {} },
+            { id: 23, grade: '4학년', name: '김가은', selectedMenu: {} },
+            { id: 24, grade: '5학년', name: '이준우', selectedMenu: {} },
+            { id: 25, grade: '6학년', name: '박하은', selectedMenu: {} },
+            { id: 26, grade: '1학년', name: '최시현', selectedMenu: {} },
+            { id: 27, grade: '2학년', name: '정소율', selectedMenu: {} },
+            { id: 28, grade: '3학년', name: '강승민', selectedMenu: {} },
+        ];
+        // 'YYYY-MM-DD_mealType': ['메뉴1', '메뉴2', '메뉴3', '메뉴4'] 형식으로 메뉴 저장
+        let savedDailyMenus = JSON.parse(localStorage.getItem('savedDailyMenus')) || {};
+        let selectedStudentRow = null; // 현재 선택된 테이블 행에 대한 참조
+
+        // 현재 날짜와 식사 시간에 맞는 오늘의 메뉴를 가져옵니다.
+        function getTodayMenus() {
+            const dateKey = menuDateInput.value;
+            const mealType = mealTypeSelect.value;
+            const key = `${dateKey}_${mealType}`;
+            return savedDailyMenus[key] || [];
+        }
+
+        // 학생 테이블을 렌더링합니다.
+        function renderStudentTable() {
+            studentTableBody.innerHTML = ''; // 기존 행을 지웁니다.
+            const currentMenus = getTodayMenus();
+            const dateKey = menuDateInput.value;
+            const mealType = mealTypeSelect.value;
+
+            students.forEach((student, index) => {
+                const row = document.createElement('tr');
+                row.classList.add('table-row');
+                row.dataset.rowIndex = index; // 쉬운 조회를 위해 인덱스 저장
+
+                // 해당 학생의 현재 날짜/식사 시간대에 대한 선택 메뉴
+                const currentStudentSelectedMenu = student.selectedMenu[`${dateKey}_${mealType}`] || '';
+
+                row.innerHTML = `
+                    <td class="table-cell">${student.id}</td>
+                    <td class="table-cell">${student.grade}</td>
+                    <td class="table-cell">${student.name}</td>
+                    <td class="table-cell menu-cell">${currentStudentSelectedMenu || '선택 안 함'}</td>
+                `;
+                studentTableBody.appendChild(row);
+            });
+            // 이전에 선택된 행이 있다면 다시 적용합니다.
+            if (selectedStudentRow) {
+                const currentSelectedRowIndex = parseInt(selectedStudentRow.dataset.rowIndex);
+                const newSelectedRow = studentTableBody.querySelector(`[data-row-index="${currentSelectedRowIndex}"]`);
+                if (newSelectedRow) {
+                    newSelectedRow.classList.add('selected');
+                    selectedStudentRow = newSelectedRow; // 참조 업데이트
+                } else {
+                    selectedStudentRow = null; // 행이 더 이상 존재하지 않으면
+                }
+            }
+        }
+
+        // 특정 행에 대한 메뉴 선택 드롭다운을 렌더링합니다.
+        function renderMenuSelectionDropdown(rowIndex) {
+            const row = studentTableBody.querySelector(`[data-row-index="${rowIndex}"]`);
+            if (!row) return;
+
+            const menuCell = row.querySelector('.menu-cell');
+            const currentMenus = getTodayMenus();
+            const dateKey = menuDateInput.value;
+            const mealType = mealTypeSelect.value;
+            const currentStudentSelectedMenu = students[rowIndex].selectedMenu[`${dateKey}_${mealType}`] || '';
+
+            const selectElement = document.createElement('select');
+            selectElement.classList.add('p-1', 'border', 'rounded', 'w-full');
+
+            // 기본 "메뉴 선택" 옵션 추가
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '메뉴 선택';
+            selectElement.appendChild(defaultOption);
+
+            // currentMenus에서 옵션 추가
+            currentMenus.forEach(menu => {
+                const option = document.createElement('option');
+                option.value = menu;
+                option.textContent = menu;
+                if (menu === currentStudentSelectedMenu) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+
+            // 드롭다운 변경 시 이벤트 리스너
+            selectElement.addEventListener('change', (event) => {
+                const newMenu = event.target.value;
+                students[rowIndex].selectedMenu[`${dateKey}_${mealType}`] = newMenu;
+                renderStudentTable(); // 업데이트된 메뉴를 표시하기 위해 테이블 다시 렌더링
+                updateSummaryTable(); // 요약 업데이트
+            });
+
+            // 셀 내용을 드롭다운으로 교체
+            menuCell.innerHTML = '';
+            menuCell.appendChild(selectElement);
+            selectElement.focus(); // 즉시 선택을 위해 드롭다운에 포커스
+        }
+
+        // 메뉴 요약 테이블을 업데이트합니다.
+        function updateSummaryTable() {
+            menuSummaryTableBody.innerHTML = ''; // 기존 행을 지웁니다.
+
+            const currentMenus = getTodayMenus();
+            const dateKey = menuDateInput.value;
+            const mealType = mealTypeSelect.value;
+
+            const menuCounts = {};
+            currentMenus.forEach(menu => {
+                menuCounts[menu] = 0; // 사용 가능한 모든 메뉴의 카운트를 0으로 초기화
+            });
+
+            students.forEach(student => {
+                const studentSelectedMenu = student.selectedMenu[`${dateKey}_${mealType}`];
+                if (studentSelectedMenu && menuCounts.hasOwnProperty(studentSelectedMenu)) {
+                    menuCounts[studentSelectedMenu]++;
+                }
+            });
+
+            if (currentMenus.length > 0) {
+                menuSummaryTableContainer.classList.remove('hidden');
+                for (const menu in menuCounts) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${menu}</td>
+                        <td>${menuCounts[menu]}명</td>
+                    `;
+                    menuSummaryTableBody.appendChild(row);
+                }
+            } else {
+                menuSummaryTableContainer.classList.add('hidden');
+            }
+        }
+
+        // 메인 타이틀 업데이트
+        function updateMainTitle() {
+            const date = menuDateInput.value;
+            const mealType = mealTypeSelect.options[mealTypeSelect.selectedIndex].text;
+            if (date) {
+                const dateObj = new Date(date);
+                const month = dateObj.getMonth() + 1;
+                const day = dateObj.getDate();
+                mainTitle.textContent = `${month}월 ${day}일의 ${mealType} 식단`;
+            } else {
+                mainTitle.textContent = '날짜를 선택해 주세요.';
+            }
+        }
+
+        // 관리자 로그인 버튼 이벤트
+        adminLoginBtn.addEventListener('click', () => {
+            if (adminPasswordInput.value === ADMIN_PASSWORD) {
+                adminSection.classList.remove('locked');
+                messageBox.innerHTML = '메뉴 관리자 로그인 성공! 이제 오늘의 메뉴를 설정할 수 있습니다.';
+                messageBox.style.justifyContent = 'center';
+                adminPasswordInput.value = ''; // 비밀번호 필드 초기화
+            } else {
+                messageBox.innerHTML = '비밀번호가 틀렸습니다. 다시 시도해 주세요.';
+                messageBox.style.justifyContent = 'center';
+            }
+        });
+
+        // "메뉴 설정" 버튼 클릭 시 이벤트 리스너
+        setTodayMenusBtn.addEventListener('click', () => {
+            const dateKey = menuDateInput.value;
+            const mealType = mealTypeSelect.value;
+
+            if (!dateKey) {
+                messageBox.innerHTML = '날짜를 먼저 선택해 주세요.';
+                messageBox.style.justifyContent = 'center';
+                return;
+            }
+
+            const inputs = [
+                menuInput1.value.trim(),
+                menuInput2.value.trim(),
+                menuInput3.value.trim(),
+                menuInput4.value.trim()
+            ];
+            const newMenus = inputs.filter(menu => menu !== ''); // 비어있지 않은 메뉴만 저장
+
+            if (newMenus.length === 0) {
+                messageBox.innerHTML = '최소 한 가지 이상의 메뉴를 입력해주세요.';
+                messageBox.style.justifyContent = 'center';
+                return;
+            }
+
+            const key = `${dateKey}_${mealType}`;
+            savedDailyMenus[key] = newMenus; // 해당 날짜와 식사 시간대의 메뉴 저장
+            localStorage.setItem('savedDailyMenus', JSON.stringify(savedDailyMenus)); // LocalStorage에 저장
+
+            // 해당 날짜/식사 시간대에 대한 학생들의 기존 선택 초기화 (새 메뉴로 인해)
+            students.forEach(student => {
+                student.selectedMenu[key] = '';
+            });
+
+            renderStudentTable(); // 업데이트된 메뉴로 테이블 다시 렌더링
+            updateSummaryTable(); // 새 메뉴 (카운트 0)로 요약 업데이트
+
+            messageBox.innerHTML = `선택된 날짜와 식사 시간대의 메뉴가 설정되었습니다. 이제 학생을 클릭하여 메뉴를 선택할 수 있습니다.`;
+            messageBox.style.justifyContent = 'center';
+            
+            // 입력 필드 초기화
+            menuInput1.value = '';
+            menuInput2.value = '';
+            menuInput3.value = '';
+            menuInput4.value = '';
+        });
+
+        // 날짜 또는 식사 시간대 변경 시 이벤트 리스너
+        menuDateInput.addEventListener('change', () => {
+            updateMainTitle();
+            renderStudentTable();
+            updateSummaryTable();
+            messageBox.innerHTML = '학생을 클릭하여 메뉴를 선택하거나, 관리자 섹션에서 메뉴를 설정해 주세요.';
+            messageBox.style.justifyContent = 'center';
+        });
+
+        mealTypeSelect.addEventListener('change', () => {
+            updateMainTitle();
+            renderStudentTable();
+            updateSummaryTable();
+            messageBox.innerHTML = '학생을 클릭하여 메뉴를 선택하거나, 관리자 섹션에서 메뉴를 설정해 주세요.';
+            messageBox.style.justifyContent = 'center';
+        });
+
+        // 테이블 행 클릭 시 이벤트 리스너 (선택 및 메뉴 드롭다운)
+        studentTableBody.addEventListener('click', (event) => {
+            let row = event.target.closest('tr');
+            if (row && row.parentNode === studentTableBody) {
+                if (selectedStudentRow) {
+                    selectedStudentRow.classList.remove('selected');
+                }
+                selectedStudentRow = row;
+                selectedStudentRow.classList.add('selected');
+
+                const rowIndex = parseInt(row.dataset.rowIndex);
+                const currentMenus = getTodayMenus();
+                
+                // 현재 날짜/식사 시간대에 메뉴가 설정되어 있다면 드롭다운 렌더링
+                if (currentMenus.length > 0) {
+                    renderMenuSelectionDropdown(rowIndex);
+                    messageBox.innerHTML = `<strong>${students[rowIndex].name}</strong> 학생이 선택되었습니다. 메뉴를 선택하거나 변경해 주세요.`;
+                } else {
+                    messageBox.innerHTML = `<strong>${students[rowIndex].name}</strong> 학생이 선택되었습니다. 먼저 관리자가 해당 날짜와 식사 시간대의 메뉴를 설정해야 합니다.`;
+                }
+                messageBox.style.justifyContent = 'center';
+            }
+        });
+
+        // 페이지 로드 시 초기 설정
+        document.addEventListener('DOMContentLoaded', () => {
+            // 오늘 날짜로 기본 설정
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0');
+            const day = today.getDate().toString().padStart(2, '0');
+            menuDateInput.value = `${year}-${month}-${day}`;
+            
+            updateMainTitle(); // 초기 제목 설정
+            renderStudentTable(); // 초기 테이블 렌더링
+            updateSummaryTable(); // 초기 요약 렌더링
+        });
+    </script>
+</body>
+</html>
